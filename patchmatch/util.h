@@ -9,7 +9,7 @@ namespace util {
 		return f * (max - min) + min;
 	}
 
-	int argmax(float v[], int n) {
+	int argmax(double v[], int n) {
 		int max_i = 0;
 		for (int i = 1; i < n; i++)
 			if (v[i] > v[max_i]) max_i = i;
@@ -17,7 +17,7 @@ namespace util {
 		return max_i;
 	}
 
-	int argmin(float v[], int n) {
+	int argmin(double v[], int n) {
 		int min_i = 0;
 		for (int i = 1; i < n; i++)
 			if (v[i] < v[min_i])min_i = i;

@@ -6,11 +6,32 @@ namespace metric {
 	using namespace cv;
 	using namespace std;
 
+	constexpr double uc2f = 1.0 / 255.0;
 
 	double sim_abs_diff(Mat& a, Mat& b, int _) {
 		Mat tmp;
 		absdiff(a, b, tmp);
-		return 1e4 - sum(sum(tmp))[0];
+		return -sum(sum(tmp))[0];
+	}
+
+	template <typename T>
+	double sim_diff_dxy(Mat& a, Mat& b, int _) {
+		double ndiff = sim_abs_diff(a, b, _);
+		double dxy = 0.0;
+		for (int i = 1; i < a.rows - 1; i++)
+		{
+			for (int j = 1; j < a.cols - 1; j++)
+			{
+				for (int k = 0; k < 3; k++)
+				{
+					dxy += abs((a.at<T>(i + 1, j)[k] * uc2f - a.at<T>(i - 1, j)[k] * uc2f)
+						- (b.at<T>(i + 1, j)[k] * uc2f - b.at<T>(i - 1, j)[k] * uc2f)) * 0.5;
+					dxy += abs((a.at<T>(i, j + 1)[k] * uc2f - a.at<T>(i, j - 1)[k] * uc2f)
+						- (b.at<T>(i, j + 1)[k] * uc2f - b.at<T>(i, j - 1)[k] * uc2f)) * 0.5;
+				}
+			}
+		}
+		return ndiff - dxy * 255.0 / 6.0;
 	}
 
 	double sigma(Mat& m, int i, int j, int block_size) {
