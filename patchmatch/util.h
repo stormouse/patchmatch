@@ -1,7 +1,5 @@
 #pragma once
 
-#include "everything.h"
-
 namespace util {
 	using namespace std;
 

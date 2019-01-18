@@ -1,4 +1,4 @@
-#include "everything.h"
+#include "pch.h"
 #include "metric.h"
 #include "util.h"
 
@@ -51,35 +51,38 @@ void patchmatch(Vector3i& f, Mat& img_dst, Mat& img_ref, int patch_size = 3, int
 	cout << "initializing..." << endl;
 	initialize(f, n_rows, n_cols, patch_size);
 
-	
 	/* iterate */
 	int row_start, row_end, col_start, col_end, step;
 
 	Vector2i v;  // current similarity compared with current patch offset
-	v.resize(n_rows); for (int i = 0; i < n_rows;i++) { v[i].resize(n_cols); }
+	v.resize(n_rows); for (int i = 0; i < n_rows; i++) { v[i].resize(n_cols); }
 
 	for (int i = 0; i < n_rows - patch_size; i++)
 		for (int j = 0; j < n_cols - patch_size; j++)
-			v[i][j] = sim(pick_patch(img_dst, i, j, 0, 0, patch_size), 
-						  pick_patch(img_ref, i, j, f[i][j][0], f[i][j][1], patch_size), 1);
+		{
+			auto p1 = pick_patch(img_dst, i, j, 0, 0, patch_size);
+			auto p2 = pick_patch(img_ref, i, j, f[i][j][0], f[i][j][1], patch_size);
+			v[i][j] = sim(p1, p2, 1);
+		}
+
 
 	bool reverse = false;
 
 	for (int t = 0; t < n_iterations; t++) {
 		
-		Mat progress(img_dst.rows, img_dst.cols, img_dst.type());
-		reconstruct(f, progress, img_ref, patch_size);
-		imshow("progress", progress);
+		//Mat progress(img_dst.rows, img_dst.cols, img_dst.type());
+		//reconstruct(f, progress, img_ref, patch_size);
+		//imshow("progress", progress);
 		//cvWaitKey(0);
 
 		/* propagate */
 		cout << "iteration " << t + 1<< endl;
 
 		if (reverse) {
-			row_start = n_rows - patch_size - 2;
-			row_end = -1;
-			col_start = n_cols - patch_size - 2;
-			col_end = -1;
+			row_start = n_rows - patch_size;
+			row_end = 1;
+			col_start = n_cols - patch_size;
+			col_end = 1;
 			step = -1;
 		}
 		else {
@@ -102,19 +105,18 @@ void patchmatch(Vector3i& f, Mat& img_dst, Mat& img_ref, int patch_size = 3, int
 
 		for (int i = row_start; i != row_end; i += step) {
 			for (int j = col_start; j != col_end; j += step) {
-
 				float sm[3];
 				Mat patch = pick_patch(img_dst, i, j, 0, 0, patch_size); 
 				// Mat ipatch = pick_patch(img_ref, i, j, f[i][j][0], f[i][j][1], patch_size);		// sim(patch, ipatch) == v[i][j]
 				sm[0] = v[i][j];
-				if (checkvalid(i, j, f[i - step][j][0], f[i - step][j][1])) {
-					Mat xpatch = pick_patch(img_ref, i, j, f[i - step][j][0], f[i - step][j][1], patch_size);
+				if (checkvalid(i, j, f[i + step][j][0], f[i + step][j][1])) {
+					Mat xpatch = pick_patch(img_ref, i, j, f[i + step][j][0], f[i + step][j][1], patch_size);
 					sm[1] = sim(patch, xpatch, 1);
 				}
 				else sm[1] = -1e6f;
 				
-				if (checkvalid(i, j, f[i][j - step][0], f[i][j - step][1])) {
-					Mat ypatch = pick_patch(img_ref, i, j, f[i][j - step][0], f[i][j - step][1], patch_size);
+				if (checkvalid(i, j, f[i][j + step][0], f[i][j + step][1])) {
+					Mat ypatch = pick_patch(img_ref, i, j, f[i][j + step][0], f[i][j + step][1], patch_size);
 					sm[2] = sim(patch, ypatch, 1);
 				}
 				else sm[2] = -1e6f;
@@ -124,8 +126,8 @@ void patchmatch(Vector3i& f, Mat& img_dst, Mat& img_ref, int patch_size = 3, int
 
 				switch (k) {
 				case 0: break;
-				case 1: f[i][j][0] = f[i - step][j][0]; f[i][j][1] = f[i - step][j][1]; break;
-				case 2: f[i][j][0] = f[i][j - step][0]; f[i][j][1] = f[i][j - step][1]; break;
+				case 1: f[i][j][0] = f[i + step][j][0]; f[i][j][1] = f[i + step][j][1]; break;
+				case 2: f[i][j][0] = f[i][j + step][0]; f[i][j][1] = f[i][j + step][1]; break;
 				default: break; // error
 				}
 			}
@@ -144,13 +146,11 @@ void patchmatch(Vector3i& f, Mat& img_dst, Mat& img_ref, int patch_size = 3, int
 					int cmin = util::max(0, int(j + f[i][j][1] - c_ws*alpha));
 					int cmax = util::min(int(j + f[i][j][1] + c_ws*alpha), n_cols - patch_size);
 
-					
 					if (rmin > rmax) rmin = rmax = f[i][j][0] + i;
 					if (cmin > cmax) cmin = cmax = f[i][j][1] + j;
 
 					int r_offset = int(util::random_range(rmin, rmax)) - i;
 					int c_offset = int(util::random_range(cmin, cmax)) - j;
-
 					
 					Mat patch = pick_patch(img_dst, i, j, 0, 0, patch_size);
 					Mat cand = pick_patch(img_ref, i, j, r_offset, c_offset, patch_size);
@@ -207,24 +207,23 @@ void testImage(const char *img_dst_path, const char *img_ref_path) {
 	
 	Mat dst = imread(img_dst_path);
 	Mat ref = imread(img_ref_path);
-	
-	assert(dst.cols == ref.cols && dst.rows == ref.rows);
+
 	assert(dst.type() == CV_8UC3);
 	
 	Vector3i mapping;
-	patchmatch(mapping, dst, ref, 5, 5);
+	patchmatch(mapping, dst, ref, 2, 5);
 	reconstruct(mapping, dst, ref, 5);
 	
 	imshow("result", dst);
-	cvWaitKey(0);
+	cv::waitKey(0);
 
-	// cvSaveImage("data\\output.jpg", &dst);
+	cv::imwrite("data\\output.jpg", dst);
 }
 
 
 int main() {
-	char *img_dst = "data\\dancing_a.png";
-	char *img_ref = "data\\dancing_b.png";
+	const char *img_dst = "data\\multiple_oreo.jpg";
+	const char *img_ref = "data\\single_oreo_500.jpg";
 
 	testImage(img_dst, img_ref);
 
